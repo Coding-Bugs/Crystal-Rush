@@ -1,571 +1,400 @@
-﻿Public Class Slot
-    Public Property ore = ""
-    Public Property hole = -1
-    Public Property task = -1
+﻿Public Class Pos
 
-    Public Sub New(ByVal o As String, ByVal h As Integer)
-        ore = o
-        hole = h
+    Public Property X As Integer = -1
+    Public Property Y As Integer = -1
+
+    Public Sub New(ByVal x, ByVal y)
+        Me.X = x
+        Me.Y = y
     End Sub
 
+    Public Function distance(ByVal targetX As Integer, ByVal targetY As Integer)
+        Return Math.Abs(Me.X - targetX) + Math.Abs(Me.Y - targetY)
+    End Function
+
+End Class
+
+
+Public Class Cell
+    Inherits Pos
+
+    Public Property Ore As String
+    Public Property Hole As Integer
+    Public Property OreRemaining As Integer = -1
+
+    Public Sub New(ByVal x As Integer, ByVal y As Integer, Optional ByVal ore As String = "", Optional ByVal hole As Integer = 0)
+        MyBase.New(x, y)
+        Me.Ore = ore
+        Me.Hole = hole
+    End Sub
+
+    Public Sub Update(ByVal ore As String, ByVal hole As Integer)
+        Me.Ore = ore
+        Me.Hole = hole
+        If Me.Ore <> "?" And Me.OreRemaining = -1 Then
+            Me.OreRemaining = Asc(Me.Ore) - Asc("0")
+        End If
+
+    End Sub
+
+    Public Function HasOreRemaining()
+        If Me.OreRemaining > 0 Then
+            Return True
+        End If
+        Return False
+    End Function
+
+End Class
+
+
+Public Class Grid
+    Public Property Cells As Cell()
+    Public Property Width
+    Public Property Height
+
+    Public Sub New(Optional ByVal width As Integer = 29, Optional ByVal height As Integer = 14)
+        Me.Width = width
+        Me.Height = height
+        ReDim Me.Cells((width + 1) * (height + 1))
+
+        For y As Integer = 0 To height
+            For x As Integer = 0 To width
+                Cells((y * width) + x) = New Cell(x, y)
+            Next
+        Next
+
+    End Sub
+
+    Public Function GetCell(ByVal x As Integer, ByVal y As Integer)
+        If (Me.Width >= x Or x >= 0) Or (Me.Height >= y Or y >= 0) Then
+            Return Me.Cells(y * Me.Width + x)
+        End If
+        Return Nothing
+    End Function
+
+    Public Sub PrintCells()
+        For j As Integer = 0 To Me.Height
+            For i As Integer = 0 To Me.Width
+                Console.Error.Write(Me.Cells(j * Me.Height + i).Ore & Me.Cells(j * Me.Height + i).Hole)
+                If i < Me.Width Then
+                    Console.Error.Write(" ")
+                End If
+            Next
+            Console.Error.WriteLine()
+        Next
+    End Sub
 End Class
 
 
 Public Class Entity
+    Inherits Pos
+    Public Property Id As Integer = -1
+    Public Property EntityType As Integer = -1
 
-    Public Property uId As Integer = -1
-    Public Property category As Integer = -1
-    Public Property x As Integer = -1
-    Public Property y As Integer = -1
-
-    Public Sub New(ByVal _u, ByVal _c, ByVal _x, ByVal _y)
-        uId = _u
-        category = _c
-        x = _x
-        y = _y
+    Public Sub New(ByVal x As Integer, ByVal y As Integer, ByVal id As Integer, ByVal type As Integer)
+        MyBase.New(x, y)
+        Me.Id = id
+        Me.EntityType = type
     End Sub
 
 End Class
 
-Public Class Robo
+
+Public Class Robot
     Inherits Entity
 
-    Public Property verbose As Boolean = False
-    Public Property inv As Integer = -1
-    Public Property task As String = ""
-    Public Property queue As Queue = New Queue()
+    Public Property Verbose As Boolean = False
+    Public Property Inv As Integer = -1
+    Public Property Task As String = ""
+    Public Property TaskQueue As Queue = New Queue()
 
-    Public Sub New(ByVal _u, ByVal _c, ByVal _x, ByVal _y, ByVal _i)
-        MyBase.New(_u, _c, _x, _y)
-        inv = _i
+    Public Sub New(ByVal x As Integer, ByVal y As Integer, ByVal id As Integer, ByVal type As Integer, ByVal inv As Integer)
+        MyBase.New(x, y, id, type)
+        Me.Inv = inv
     End Sub
 
-    Public Sub gotOre()
+    Public Sub Update(ByVal x As Integer, ByVal y As Integer, ByVal inv As Integer)
+        Me.X = x
+        Me.Y = y
+        Me.Inv = inv
+    End Sub
 
-        If verbose = True Then
-            Console.Error.WriteLine("Robot #" & uId & " has ore, is overwriting orders and returning to base")
+    Public Sub Execute()
+        Console.WriteLine(Me.Task)
+    End Sub
+
+    Public Sub GotOre()
+        If Me.Verbose = True Then
+            Console.Error.WriteLine("Robot #" & Me.Id & " has ore, is overwriting orders and returning to base")
         End If
 
         ' override current task
-        task = "MOVE 0 " & y
+        Me.Task = "MOVE 0 " & Me.Y
 
         ' clear queue
-        clearQueue()
+        ClearQueue()
 
         ' issue command
-        Console.WriteLine(task)
+        Console.WriteLine(Task)
     End Sub
 
-    Public Sub clearQueue()
+    Public Sub ClearQueue()
         ' clear the queue 
-        While queue.Count > 0
-            queue.Dequeue()
+        While Me.TaskQueue.Count > 0
+            Me.TaskQueue.Dequeue()
         End While
-
-    End Sub
-
-    ' get next queued task or reset task if queue is empty
-    Public Sub nextTask()
-        If queue.Count = 0 Then
-            task = ""
-        Else
-            task = queue.Dequeue()
-        End If
     End Sub
 
 
-    Public Sub action()
-        ' if there is no current task, get a task from the queue and do it
-        If task = "" Then
-            If verbose = True Then
-                Console.Error.WriteLine("Robot #" & uId & " has NO current order")
-            End If
-
-            nextTask()
-
-            If task = "" Then
-                If verbose = True Then
-                    Console.Error.WriteLine("Robot #" & uId & " has NO queued orders")
-                End If
-
-                Console.WriteLine("WAIT")
-            Else
-                If verbose = True Then
-                    Console.Error.WriteLine("Robot #" & uId & " grabs new order: " & task)
-                End If
-
-                Console.WriteLine(task)
-            End If
-            ' Bot has a current task
-        Else
-            If verbose = True Then
-                Console.Error.WriteLine("Robot #" & uId & " has order: " & task)
-            End If
-
-            Dim command As String() = task.Split(" ")
-
-            ' Robot has ore in inventory
-            If inv = 4 Then
-                gotOre()
-                ' Robot has REQUEST command
-            ElseIf command(0) = "REQUEST" Then
-                ' If i have a radar
-                If command(1) = "RADAR" And inv = 2 Then
-                    task = queue.Dequeue()
-
-                    If verbose = True Then
-                        Console.Error.WriteLine("Robot #" & uId & " got RADAR and has new order: " & task)
-                    End If
-
-                    Console.WriteLine(task)
-
-                    ' If i have a Trap
-                ElseIf command(1) = "TRAP" And inv = 3 Then
-                    task = queue.Dequeue()
-
-                    If verbose = True Then
-                        Console.Error.WriteLine("Robot #" & uId & " got TRAP and has new order: " & task)
-                    End If
-
-                    Console.WriteLine(task)
-
-                    ' Keep trying to get Item
-                Else
-                    Console.WriteLine(task)
-                End If
-                ' Robot has MOVE command
-            ElseIf command(0) = "MOVE" Then
-                ' arrived at target grid
-                If command(1) = x And command(2) = y Then
-                    If verbose = True Then
-                        Console.Error.WriteLine("Robot #" & uId & " has arrived at (" & x & " " & y & ")")
-                    End If
-                    nextTask()
-                    If task = "" Then
-                        If verbose = True Then
-                            Console.Error.WriteLine("Robot #" & uId & " is waiting for new orders")
-                        End If
-
-                        Console.WriteLine("WAIT")
-                    Else
-                        If verbose = True Then
-                            Console.Error.WriteLine("Robot #" & uId & " has new order: " & task)
-                        End If
-
-                        Console.WriteLine(task)
-                    End If
-                    ' else keep moving towards spot
-                Else
-                    Console.WriteLine(task)
-                End If
-                ' Robot has DIG command
-            ElseIf command(0) = "DIG" Then
-                ' check if im in bounds for digging
-                If inv = 4 Then
-                    gotOre()
-                    ' if I am at my target
-                ElseIf inv = -1 And ((x = command(1) And (y = command(2) - 1 Or y = command(2) + 1)) Or (y = command(2) And (x = command(1) - 1 Or x = command(1) + 1))) Then
-                    Console.WriteLine(task)
-                    nextTask()
-                    ' else keep moving towards spot
-                Else
-                    Console.WriteLine(task)
-                End If
-
-
-                ' Robot has WAIT command
-            ElseIf command(0) = "WAIT" Then
-                If verbose = True Then
-                    Console.Error.WriteLine("Robot #" & uId & " is waiting")
-                End If
-
-                Console.WriteLine(task)
-
-                nextTask()
-            End If
-        End If
-
+    Public Sub AssignTask(ByVal command As String)
+        Me.Task = command
     End Sub
+
+
+    Public Sub AddTask(ByVal command As String)
+        Me.TaskQueue.Enqueue(command)
+    End Sub
+
 
 End Class
+
+
+Class Game
+    Public Property Grid As Grid
+
+    Public Property MyScore As Integer
+    Public Property EnemyScore As Integer
+    Public Property RadarCooldown As Integer
+    Public Property TrapCooldown As Integer
+
+    Public Property Verbose As Boolean
+    Public Property RadarReady As Boolean
+
+    Public Property Radars As List(Of Entity)
+    Public Property Traps As List(Of Entity)
+    Public Property MyRobots As Dictionary(Of Integer, Robot)
+    Public Property EnemyRobots As Dictionary(Of Integer, Robot)
+
+    Public Sub New(Optional ByVal width As Integer = 30, Optional ByVal height As Integer = 15)
+        Me.Grid = New Grid(width - 1, height - 1)
+
+        Me.MyScore = 0
+        Me.EnemyScore = 0
+        Me.RadarCooldown = 0
+        Me.TrapCooldown = 0
+
+        Me.Verbose = False
+        Me.RadarReady = True
+
+        Me.Radars = New List(Of Entity)
+        Me.Traps = New List(Of Entity)
+        Me.MyRobots = New Dictionary(Of Integer, Robot)
+        Me.EnemyRobots = New Dictionary(Of Integer, Robot)
+    End Sub
+
+
+    Public Sub PrintMyRobots()
+        For Each bot As Robot In Me.MyRobots.Values()
+            Console.Error.WriteLine("Ally Id:{0}, X: {1}, Y: {2}, Inv:{3}", bot.Id, bot.X, bot.Y, bot.Inv)
+        Next
+        Console.Error.WriteLine()
+    End Sub
+
+
+    Public Sub PrintEnemyRobots()
+        For Each bot As Robot In Me.EnemyRobots.Values()
+            Console.Error.WriteLine("Enemy Id:{0}, X: {1}, Y: {2}, Inv:{3}", bot.Id, bot.X, bot.Y, bot.Inv)
+        Next
+        Console.Error.WriteLine()
+    End Sub
+
+
+    Public Sub PrintRadars()
+        For Each ent As Entity In Me.Radars
+            Console.Error.WriteLine("Radar Id:{0}, X: {1}, Y: {2}", ent.Id, ent.X, ent.Y)
+        Next
+        Console.Error.WriteLine()
+    End Sub
+
+
+    Public Sub PrintTraps()
+        For Each ent As Entity In Me.Traps
+            Console.Error.WriteLine("Trap Id:{0}, X: {1}, Y: {2}", ent.Id, ent.X, ent.Y)
+        Next
+        Console.Error.WriteLine()
+    End Sub
+End Class
+
 
 Module Player
     ' Deliver more ore to hq (left side of the map) than your opponent. Use radars to find ore but beware of traps!
     Public Function GetRand(ByVal Upper As Integer, ByVal Lower As Integer) As Integer
-        ' by making Generator static, we preserve the same instance '
-        ' (i.e., do not create new instances with the same seed over and over) '
-        ' between calls '
-        Static Generator As System.Random = New System.Random()
+        ' by making Generator static, we preserve the same instance
+        ' (i.e., do not create new instances with the same seed over and over) 
+        ' between calls
+        Static Generator As New System.Random()
         Return Generator.Next(Lower, Upper)
     End Function
 
-    Public Function dequeue(ByRef oreQueues() As Queue(Of String), ByVal width As Integer)
-        For i As Integer = 0 To width
-            If oreQueues(i).Count > 0 Then
-                Return oreQueues(i).Dequeue()
-            End If
-        Next
-        Return ""
-    End Function
 
+    'Function walkRadars(ByVal radars As Entity())
 
-    Function nextRadar(ByVal x As Integer, ByVal y As Integer, ByVal width As Integer, ByVal height As Integer) As IEnumerable
-        Dim neighbors As New Queue(Of Integer())
-        Dim targetX As Integer = 1
-        Dim targetY As Integer = 0
-
-        ' Right
-        If x + 5 <= width - 1 Then
-            targetX = x + 5
-        Else
-            targetX = width - 1
-        End If
-
-        ' Lower
-        If y + 4 <= height - 1 Then
-            targetY = y + 4
-        Else
-            targetY = height - 1
-        End If
-        neighbors.Enqueue({targetX, targetY})
-
-        ' Upper       
-        If y - 5 >= 0 Then
-            targetY = y - 5
-        Else
-            targetY = 0
-        End If
-        neighbors.Enqueue({targetX - 1, targetY})
-
-
-        Return neighbors
-    End Function
+    'End Function
 
     Sub Main()
-
-        Dim verbose As Boolean = False
-
-        ' Initialize Random Number Generator
-        Randomize()
-
-        ' size of the map
         Dim inputs As String() = Console.ReadLine().Split(" ")
-        Dim width As Integer = inputs(0)
-        Dim height As Integer = inputs(1)
 
-        ' Data to persist for all turns
-        Dim myBots As New Dictionary(Of Integer, Robo)
-        Dim enemyBots As New Dictionary(Of Integer, Robo)
-
-        Dim radars As New Dictionary(Of Integer, Entity)
-        Dim radIdx As Integer = 0
-        Dim radRdy As Boolean = True
-        Dim fstRad As Boolean = True
-        Dim radQueue As New Queue(Of String)
-        Dim nexRadQueue As New Queue(Of Integer())
-        Dim traps As New Dictionary(Of Integer, Entity)
-        Dim trapIdx As Integer = 0
-
-        Dim board(height - 1, width - 1) As Slot
-
-
-        Dim oreQueues(width) As Queue(Of String)
-        For i As Integer = 0 To width
-            oreQueues(i) = New Queue(Of String)
-        Next
-
-        Dim oreCount As Integer = 0
-
+        Dim game As New Game(inputs(0), inputs(1))
+        game.Verbose = True
+        If game.Verbose = True Then
+            Console.Error.WriteLine("Width: " & game.Grid.Width)
+            Console.Error.WriteLine("Height: " & game.Grid.Height)
+            Console.Error.WriteLine()
+        End If
 
 
         ' game loop
         While True
-            Dim myScore As Integer ' Amount of ore delivered
-            Dim opponentScore As Integer
             inputs = Console.ReadLine().Split(" ")
-            myScore = inputs(0)
-            opponentScore = inputs(1)
 
-            For i As Integer = 0 To height - 1
+
+            ' Update Scores
+            game.MyScore = inputs(0)
+            game.EnemyScore = inputs(1)
+            If game.Verbose = True Then
+                Console.Error.WriteLine("MyScore: " & game.MyScore)
+                Console.Error.WriteLine("EnemyScore: " & game.EnemyScore)
+                Console.Error.WriteLine()
+            End If
+
+
+            ' Update Cells
+            For j As Integer = 0 To game.Grid.Height
                 inputs = Console.ReadLine().Split(" ")
-                For j As Integer = 0 To width - 1
-                    Dim ore As String ' amount of ore or "?" if unknown
-                    Dim hole As Integer ' 1 if cell has a hole
-                    ore = inputs(2 * j)
-                    hole = inputs(2 * j + 1)
+                For i As Integer = 0 To game.Grid.Width
+                    Dim ore As String = inputs(2 * i) ' amount of ore or "?" if unknown
+                    Dim hole As Integer = inputs(2 * i + 1) ' 1 if cell has a hole
 
-
-                    If board(i, j) Is Nothing Then
-                        Dim slot As New Slot(ore, hole)
-                        board(i, j) = slot
-                    Else
-                        If ore <> "?" And board(i, j).task = -1 Then
-                            board(i, j).task = Asc(ore) - Asc("0")
-                        End If
-                        board(i, j).ore = ore
-                        board(i, j).hole = hole
-                    End If
-
-
-                    If board(i, j).ore <> "?" And board(i, j).task > 0 Then
-                        Dim coords As String = j.ToString() & " " & i.ToString()
-                        If oreQueues(j).Contains(coords) = False Then
-                            oreQueues(j).Enqueue(coords)
-                            oreCount += 1
-                        End If
-                    End If
-
+                    game.Grid.Cells(j * game.Grid.Height + i).Update(ore, hole)
                 Next
             Next
+            ' Print updated board
+            If game.Verbose = True Then
+                Console.Error.WriteLine("Board:")
+                game.Grid.PrintCells()
+                Console.Error.WriteLine()
+            End If
+
 
             Dim entityCount As Integer ' number of entities visible to you
-            Dim radarCooldown As Integer ' turns left until a new radar can be requested
-            Dim trapCooldown As Integer ' turns left until a new trap can be requested
-
-
             inputs = Console.ReadLine().Split(" ")
             entityCount = inputs(0)
-            radarCooldown = inputs(1)
-            trapCooldown = inputs(2)
-            If verbose = True Then
-                Console.Error.WriteLine("Radar Cooldown: " & radarCooldown.ToString())
-                Console.Error.WriteLine("Trap Cooldown: " & trapCooldown.ToString())
+
+
+            ' Update Cooldowns
+            game.RadarCooldown = inputs(1) ' turns left until a new radar can be requested
+            game.TrapCooldown = inputs(2) ' turns left until a new trap can be requested
+            If game.Verbose = True Then
+                Console.Error.WriteLine("Radar Cooldown: " & game.RadarCooldown)
+                Console.Error.WriteLine("Trap Cooldown: " & game.TrapCooldown)
+                Console.Error.WriteLine()
             End If
 
-            ' reset boolean for bot getting a radar
-            If radarCooldown > 0 Then
-                radRdy = True
+            If game.RadarCooldown > 0 Then
+                game.RadarReady = True
             End If
 
+
+            ' Clear last turns data
+            game.Radars.Clear()
+            game.Traps.Clear()
+
+            ' Update Entities
             For i As Integer = 0 To entityCount - 1
                 Dim entityId As Integer ' unique id of the entity
                 Dim entityType As Integer ' 0 for your robot, 1 for other robot, 2 for radar, 3 for trap
-                Dim x As Integer ' x position of the entity
-                Dim y As Integer ' y position of the entity
-                Dim inv As Integer ' if this entity is a robot, the item it is carrying (-1 for NONE, 2 for RADAR, 3 for TRAP, 4 for ORE)
-
+                Dim x As Integer
+                Dim y As Integer ' position of the entity
+                Dim item As Integer ' if this entity is a robot, the item it is carrying (-1 for NONE, 2 for RADAR, 3 for TRAP, 4 for ORE)
                 inputs = Console.ReadLine().Split(" ")
                 entityId = inputs(0)
                 entityType = inputs(1)
                 x = inputs(2)
                 y = inputs(3)
-                inv = inputs(4)
-                ' My Robot
+                item = inputs(4)
+
                 If entityType = 0 Then
-                    If myBots.ContainsKey(entityId) = True Then
-                        ' Console.Error.WriteLine("Updating my Bot: " & entityId & ", X: " & x & ", Y: " & y)
-                        myBots(entityId).x = x
-                        myBots(entityId).y = y
-                        myBots(entityId).inv = inv
+                    If game.MyRobots.ContainsKey(entityId) Then
+                        game.MyRobots(entityId).Update(x, y, item)
                     Else
-                        ' Console.Error.WriteLine("Adding my Bot: " & entityId & ", X: " & x & ", Y: " & y)
-                        Dim bot As Robo = New Robo(entityId, entityType, x, y, inv)
-                        myBots.Add(entityId, bot)
+                        game.MyRobots.Add(entityId, New Robot(x, y, entityId, entityType, item))
                     End If
-                    ' Enemy Robot
                 ElseIf entityType = 1 Then
-                    If enemyBots.ContainsKey(entityId) = True Then
-                        ' Console.Error.WriteLine("Updating enemy Bot: " & entityId & ", X: " & x & ", Y: " & y)
-                        enemyBots(entityId).x = x
-                        enemyBots(entityId).y = y
-                        enemyBots(entityId).inv = inv
+                    If game.EnemyRobots.ContainsKey(entityId) Then
+                        game.EnemyRobots(entityId).Update(x, y, item)
                     Else
-                        ' Console.Error.WriteLine("Adding enemy Bot: " & entityId & ", X: " & x & ", Y: " & y)
-                        Dim bot As Robo = New Robo(entityId, entityType, x, y, inv)
-                        enemyBots.Add(entityId, bot)
+                        game.EnemyRobots.Add(entityId, New Robot(x, y, entityId, entityType, item))
                     End If
-                    ' Radar
                 ElseIf entityType = 2 Then
-                    If radars.ContainsKey(entityId) = False Then
-                        If verbose = True Then
-                            Console.Error.WriteLine("Adding radar: " & entityId & ", X: " & x & ", Y: " & y)
-                        End If
-                        Dim sad As Entity = New Entity(entityId, entityType, x, y)
-                        radars.Add(entityId, sad)
-                    End If
-                    ' Trap
+                    game.Radars.Add(New Entity(x, y, entityId, entityType))
                 Else
-                    If traps.ContainsKey(entityId) = True Then
-                        If verbose = True Then
-                            Console.Error.WriteLine("Updating trap: " & entityId & ", X: " & x & ", Y: " & y)
-                        End If
-                        traps(entityId).x = x
-                        traps(entityId).y = y
-                    Else
-                        If verbose = True Then
-                            Console.Error.WriteLine("Adding trap: " & entityId & ", X: " & x & ", Y: " & y)
-                        End If
-                        Dim trap As Entity = New Entity(entityId, entityType, x, y)
-                        traps.Add(entityId, trap)
-                    End If
+                    game.Traps.Add(New Entity(x, y, entityId, entityType))
                 End If
-
             Next
-
-            If verbose = True Then
-                Dim cnt = 0
-                For Each que As Queue(Of String) In oreQueues
-                    If que.Count > 0 Then
-                        For Each a As String In que
-                            Dim cords = a.Split(" ")
-                            Console.Error.WriteLine("Queue #" & cnt & " has (" & cords(0) & " " & cords(1) & ") @ quantity: " & board(cords(1), cords(0)).task)
-                        Next
-                    End If
-                    cnt += 1
-                Next
+            ' Print Updated Entities and Robots
+            If game.Verbose = True Then
+                game.PrintMyRobots()
+                game.PrintEnemyRobots()
+                game.PrintRadars()
+                game.PrintTraps()
             End If
 
-            ' Command Region 
-            For Each bot As Robo In myBots.Values()
+            ' Command Space
+            For Each bot As Robot In game.MyRobots.Values()
+                ' Print Bot's info
+                If game.Verbose = True Then
+                    Console.Error.WriteLine("Bot#{0} X: {1}, Y: {2}, Inv: {3}, Task: {4}", bot.Id, bot.Inv, bot.X, bot.Y, bot.Task)
+                End If
+
 
                 Dim x As Integer = 0
                 Dim y As Integer = 0
 
-                If verbose = True Then
-                    Console.Error.WriteLine("Ore Queue Count: " & oreCount)
-                    Console.Error.WriteLine("Bot #" & bot.uId & " Inv: " & bot.inv & ", X: " & bot.x & ", Y: " & bot.y)
-                End If
 
-                ' Robot has no current or pending orders
-                If bot.queue.Count = 0 And bot.task = "" Then
-
-                    ' If robot is holding ore
-                    If bot.inv = 4 Then
-                        bot.gotOre()
-
-                        ' if there is more ore than bots
-                    ElseIf oreCount > 5 Then
-
-                        ' order robot to dig up ore and then return it
-
-                        ' get ore cords
-                        Dim coords As String() = dequeue(oreQueues, width).split(" ")
-
-
-                        x = coords(0)
-                        y = coords(1)
-
-                        ' lower ore count
-                        oreCount -= 1
-                        board(y, x).task -= 1
-
-                        If verbose = True Then
-                            Console.Error.WriteLine("Priority ordering Bot #" & bot.uId & " to DIG at " & x & " " & y)
-                            Console.Error.WriteLine("Ore remaining in " & x & " " & y & ": " & board(y, x).task)
-                        End If
-
-                        ' issue command
-                        bot.task = "DIG " & x.ToString() & " " & y.ToString()
-                        bot.queue.Enqueue("MOVE 0 " & bot.y)
-                        bot.action()
-                        ' if there is a radar available
-                    ElseIf radarCooldown = 0 And radRdy = True Then
-                        ' order bot to get radar
-                        If verbose = True Then
-                            Console.Error.WriteLine("Ordering Bot #" & bot.uId & " to get RADAR")
-                        End If
-
-                        bot.task = "REQUEST RADAR"
-                        radRdy = False
-
-                        x = 0
-                        y = 0
-
-                        If fstRad = True Then
-                            x = Int(width / 4)
-                            y = Int(height / 2)
-
-                            fstRad = False
-                            If verbose = True Then
-                                Console.Error.WriteLine("First Radar location (" & x & ", " & y & ")")
-                            End If
+                ' Check for primary derivative  
+                If bot.Task = "" And bot.TaskQueue.Count = 0 Then
+                    If bot.Inv = 4 Then
+                        bot.GotOre()
+                    ElseIf game.RadarCooldown = 0 And game.RadarReady = True Then
+                        ' Place first radar at 1/4 horizontally and 1/2 vertically away from the HQ
+                        If game.Radars.Count = 0 Then
+                            x = Int(game.Grid.Width / 4)
+                            y = Int(game.Grid.Height / 2)
                         Else
-                            ' if there are no radars queued
-                            If radQueue.Count = 0 Then
-                                x = GetRand(Int(width * 3 / 4), Int(width * 1 / 4))
-                                y = GetRand(Int(height * 3 / 4), Int(height * 1 / 4))
-                                If verbose = True Then
-                                    Console.Error.WriteLine("Random next Radar location from nextRadQueue (" & x & ", " & y & ")")
-                                End If
-                                ' if there are no more neighbors queued
-                            ElseIf nexRadQueue.Count = 0 Then
-                                Dim radCoords As String() = radQueue.Dequeue().Split(" ")
-                                nexRadQueue = nextRadar(radCoords(0), radCoords(1), width, height)
-
-                                Dim newCoords As Integer() = nexRadQueue.Dequeue()
-                                x = newCoords(0)
-                                y = newCoords(1)
-                                If verbose = True Then
-                                    Console.Error.WriteLine("Next Radar location from nextRadar (" & x & ", " & y & ")")
-                                End If
-                                ' grab next neighbor
-                            Else
-                                Dim coords As Integer() = nexRadQueue.Dequeue()
-
-                                x = coords(0)
-                                y = coords(1)
-                                If verbose = True Then
-                                    Console.Error.WriteLine("Next Radar location from nextRadQueue (" & x & ", " & y & ")")
-                                End If
-                            End If
+                            x = GetRand(game.Grid.Width - 4, 4)
+                            y = GetRand(game.Grid.Height - 4, 4)
                         End If
 
-                        If verbose = True Then
-                            Console.Error.WriteLine("Next Radar location (" & x & ", " & y & ")")
+                        If game.Verbose = True Then
+                            Console.Error.WriteLine("Ordering Bot#{0} to put RADAR at ({1}, {2})", bot.Id, x, y)
                         End If
 
-                        radQueue.Enqueue(x & " " & y)
+                        bot.AssignTask("REQUEST RADAR")
+                        bot.AddTask("DIG " & x.ToString() & " " & y.ToString())
+                        bot.AddTask("WAIT")
 
-                        bot.queue.Enqueue("DIG " & x.ToString() & " " & y.ToString())
-                        bot.queue.Enqueue("WAIT")
+                        game.RadarReady = False
 
-                        bot.action()
-                        ' if ore is available
-                    ElseIf oreCount > 0 Then
-
-                        ' get ore cords
-                        Dim coords As String() = dequeue(oreQueues, width).split(" ")
-
-
-                        x = coords(0)
-                        y = coords(1)
-
-                        ' lower ore count
-                        board(y, x).task -= 1
-                        oreCount -= 1
-
-                        ' order robot to dig up ore and then return it
-                        If verbose = True Then
-                            Console.Error.WriteLine("Ordering Bot #" & bot.uId & " to DIG at " & x & " " & y)
-                            Console.Error.WriteLine("Ore remaining in " & x & " " & y & ": " & board(y, x).task)
-                        End If
-
-                        ' issue command
-                        bot.task = "DIG " & x.ToString() & " " & y.ToString()
-                        bot.queue.Enqueue("MOVE 0 " & bot.y)
-
-
-                        bot.action()
-                        ' if no ore and no radar then move to random nearby square
                     Else
-                        If verbose = True Then
-                            Console.Error.WriteLine("Ordering Bot #" & bot.uId & " to MOVE")
+                        If game.Verbose = True Then
+                            Console.Error.WriteLine("Ordering Bot#{0} to MOVE to ({1}, {2})", bot.Id, bot.X, bot.Y)
                         End If
 
-                        bot.task = "MOVE " & GetRand(Int(width * 2 / 3), Int(width * 1 / 4)) & " " & GetRand(Int(height * 2 / 3), Int(height * 1 / 4))
-
-                        bot.action()
+                        bot.Task = "MOVE " & GetRand(Int(game.Grid.Width * 2 / 3), Int(game.Grid.Width * 1 / 4)) & " " & GetRand(Int(game.Grid.Height * 2 / 3), Int(game.Grid.Height * 1 / 4))
                     End If
-                    ' Robot has order and should continue    
-                Else
-                    If verbose = True Then
-                        Console.Error.WriteLine("Robot #" & bot.uId & " has orders: " & bot.task)
-                    End If
-                    bot.action()
                 End If
-                If verbose = True Then
-                    Console.Error.WriteLine()
-                End If
+                bot.Execute()
+                Console.Error.WriteLine()
             Next
 
         End While
