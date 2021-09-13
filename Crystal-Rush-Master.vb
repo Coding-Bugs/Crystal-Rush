@@ -104,6 +104,7 @@ Public Class Robot
     Inherits Entity
 
     Public Property Verbose As Boolean = False
+    Public Property Dug As Boolean = False
     Public Property Inv As Integer = -1
     Public Property Task As String = ""
     Public Property TaskQueue As Queue = New Queue()
@@ -119,10 +120,6 @@ Public Class Robot
         Me.Inv = inv
     End Sub
 
-    Public Sub Execute()
-        Console.WriteLine(Me.Task)
-    End Sub
-
     Public Sub GotOre()
         If Me.Verbose = True Then
             Console.Error.WriteLine("Robot #" & Me.Id & " has ore, is overwriting orders and returning to base")
@@ -133,9 +130,6 @@ Public Class Robot
 
         ' clear queue
         ClearQueue()
-
-        ' issue command
-        Console.WriteLine(Task)
     End Sub
 
     Public Sub ClearQueue()
@@ -154,6 +148,71 @@ Public Class Robot
     Public Sub AddTask(ByVal command As String)
         Me.TaskQueue.Enqueue(command)
     End Sub
+
+
+    Public Function GetNextTask()
+        If Me.TaskQueue.Count = 0 Then
+            Return ""
+        End If
+        Return Me.TaskQueue.Dequeue()
+    End Function
+
+
+    Public Sub Process()
+
+        Console.Error.WriteLine("Processing Task {0}", Me.Task)
+
+        If Me.Task = "" Then
+            AssignTask(GetNextTask())
+            Return
+        End If
+
+        Dim command As String() = Me.Task.Split(" ")
+
+        If command(0) = "REQUEST" Then
+            ' The REQUEST command is only completed if bot receives item
+            If Inv = 2 Or Inv = 3 Then
+                AssignTask(GetNextTask())
+            End If
+        ElseIf command(0) = "DIG" Then
+            ' The dig command is only completed if I have ore, or I have already tried to dig in my target already 
+            If Inv = 4 Then
+                GotOre()
+            ElseIf Inv = -1 And ((Me.X = command(1) And (Me.Y <= command(2) + 1 And Me.Y >= command(2) - 1)) Or
+                                 (Me.Y = command(2) And (Me.X <= command(1) + 1 And Me.X >= command(1) - 1))) Then
+                If Dug = True Then
+                    Dug = False
+                    AssignTask(GetNextTask())
+                Else
+                    Dug = True
+                End If
+            Else
+                Dug = False
+            End If
+        ElseIf command(0) = "MOVE" Then
+            If (Me.X = command(1) And (Me.Y <= command(2) + 1 And Me.Y >= command(2) - 1)) Or
+               (Me.Y = command(2) And (Me.X <= command(1) + 1 And Me.X >= command(1) - 1)) Then
+                AssignTask(GetNextTask())
+            End If
+        ElseIf command(0) = "WAIT" Then
+            AssignTask(GetNextTask())
+        Else
+            AssignTask(GetNextTask())
+            ClearQueue()
+        End If
+    End Sub
+
+
+    Public Sub Execute()
+        Process()
+        Console.Error.WriteLine("Executing Order: {0}", Me.Task)
+        If Me.Task = "" Then
+            Console.WriteLine("WAIT")
+        Else
+            Console.WriteLine(Me.Task)
+        End If
+    End Sub
+
 
 
 End Class
@@ -353,7 +412,7 @@ Module Player
             For Each bot As Robot In game.MyRobots.Values()
                 ' Print Bot's info
                 If game.Verbose = True Then
-                    Console.Error.WriteLine("Bot#{0} X: {1}, Y: {2}, Inv: {3}, Task: {4}", bot.Id, bot.Inv, bot.X, bot.Y, bot.Task)
+                    Console.Error.WriteLine("Bot#{0} X: {1}, Y: {2}, Inv: {3}, Task: {4}", bot.Id, bot.X, bot.Y, bot.Inv, bot.Task)
                 End If
 
 
